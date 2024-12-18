@@ -4,7 +4,7 @@
 **Net-ID**: jz855  
 **Date**: 2024-12-18  
 
-This project implements a **distributed machine learning pipeline** using **gRPC-based communication** for training a **Multi-Layer Perceptron (MLP)** model on the **MNIST dataset**. It simulates GPU device servers for distributed computation and a coordinator server for orchestration. The **AllReduce Ring Algorithm** synchronizes gradients during training.
+This project implements a **distributed machine learning pipeline** using **gRPC-based communication** for training a **Multi-Layer Perceptron (MLP)** model on the **MNIST dataset**. It simulates GPU device servers for distributed computation and a coordinator server for orchestration. The **AllReduce Ring Algorithm** is used for gradient synchronization during training.
 
 ---
 
@@ -15,7 +15,7 @@ This project implements a **distributed machine learning pipeline** using **gRPC
    - [GPU Coordinator Server](#gpu-coordinator-server)  
    - [GPU Device Server](#gpu-device-server)  
 3. [ML Training and Testing](#ml-training-and-testing)  
-4. [Testing the Components](#testing-the-components)  
+4. [Pipeline Execution](#pipeline-execution)  
 
 ---
 
@@ -32,19 +32,19 @@ This project implements a **distributed machine learning pipeline** using **gRPC
    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
    ```
 
-3. **Dependencies**:  
-   Use the `go.mod` file to install project dependencies:  
+3. **Install Dependencies**:  
+   Navigate to the project directory and run:
    ```bash
    cd DSML
    go mod tidy
    ```
 
-4. **MNIST Dataset**:  
-Ensure these files are in the `data/` directory (source: `https://git-disl.github.io/GTDLBench/datasets/mnist_datasets/`):
-- `train-images-idx3-ubyte.gz`  
-- `train-labels-idx1-ubyte.gz`  
-- `t10k-images-idx3-ubyte.gz`  
-- `t10k-labels-idx1-ubyte.gz`  
+4. **Download MNIST Dataset**:  
+   Ensure the following files are located in the `data/` directory (source: [MNIST Datasets](https://git-disl.github.io/GTDLBench/datasets/mnist_datasets/)):
+   - `train-images-idx3-ubyte.gz`  
+   - `train-labels-idx1-ubyte.gz`  
+   - `t10k-images-idx3-ubyte.gz`  
+   - `t10k-labels-idx1-ubyte.gz`
 
 ---
 
@@ -52,14 +52,24 @@ Ensure these files are in the `data/` directory (source: `https://git-disl.githu
 
 ### **2.1. GPU Coordinator Server**
 
-The **GPU Coordinator Server** orchestrates distributed training by:  
-- **CommInit**: Initializing communication with device servers.  
-- **AllReduceRing**: Synchronizing gradients using the AllReduce Ring algorithm.  
+The **GPU Coordinator Server** is responsible for:
+- **CommInit**: Initializing communication with device servers.
+- **AllReduceRing**: Synchronizing gradients using the AllReduce Ring algorithm.
 - **Health Monitoring**: Checking the availability of connected devices.
 
+#### **Tests for GPU Coordinator Server**
 
-#### **Test the GPU Coordinator Server**  
+The following tests validate the GPU Coordinator Server:
 
+1. **TestAllReduceComparison**: Compares the performance of Naive AllReduce and AllReduce Ring implementations. It highlights the latency improvement (Naive: 83ms, Ring: 8ms).
+2. **TestCommInitWithInvalidDevices**: Verifies that invalid devices are correctly rejected during communication initialization.
+3. **TestMemcpyHostToDeviceAndDeviceToHost**: Tests memory copy operations between host and device.
+4. **TestGroupOperationsWithoutComm**: Checks behavior of group operations without active communication.
+5. **TestCommDestroyInvalidId**: Ensures safe destruction of communicators with invalid IDs.
+6. **TestAllReduceRingSingleDevice**: Validates AllReduce Ring functionality with a single device.
+7. **TestCoordinatorDeviceFailure**: Simulates device failures and ensures proper error handling during AllReduce.
+
+Run the test suite to validate the Coordinator Server:
 ```bash
 cd DSML/gpu_coordinator_service
 go test -v
@@ -70,67 +80,49 @@ go test -v
     allreduce_comparison_test.go:75: CommInit successful: CommId=0, Devices=3
 2024/12/18 10:35:36 Naive AllReduce completed: DataSize=1048576, Latency=10ms, TotalTime=83ms, TotalDataTransferred=6291456 bytes
 2024/12/18 10:35:36 AllReduceRing step completed successfully for Communicator 0
-2024/12/18 10:35:36 AllReduceRing step completed successfully for Communicator 0
-2024/12/18 10:35:36 AllReduceRing step completed successfully for Communicator 0
-2024/12/18 10:35:36 AllReduceRing step completed successfully for Communicator 0
-    allreduce_comparison_test.go:127: 
-        --- AllReduce Comparison ---
-    allreduce_comparison_test.go:128: Naive AllReduce: Time=126ms, DataTransferred=6291456 bytes
-    allreduce_comparison_test.go:129: Ring AllReduce:  Time=8ms
-2024/12/18 10:35:36 Communicator 0 destroyed
 --- PASS: TestAllReduceComparison (0.17s)
-=== RUN   TestCommInitWithInvalidDevices
---- PASS: TestCommInitWithInvalidDevices (0.01s)
-=== RUN   TestMemcpyHostToDeviceAndDeviceToHost
-2024/12/18 10:35:36 Communicator 0 destroyed
---- PASS: TestMemcpyHostToDeviceAndDeviceToHost (0.01s)
-=== RUN   TestGroupOperationsWithoutComm
---- PASS: TestGroupOperationsWithoutComm (0.00s)
-=== RUN   TestCommDestroyInvalidId
---- PASS: TestCommDestroyInvalidId (0.00s)
-=== RUN   TestCoordinatorAllReduceRing
-2024/12/18 10:35:36 Communicator 0 destroyed
---- PASS: TestCoordinatorAllReduceRing (0.00s)
-=== RUN   TestAllReduceRingSingleDevice
-2024/12/18 10:35:36 Communicator 0 destroyed
---- PASS: TestAllReduceRingSingleDevice (0.01s)
-=== RUN   TestCoordinatorDeviceFailure
-2024/12/18 10:35:41 Device 1 at 127.0.0.1:59515 unreachable: rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing: dial tcp 127.0.0.1:59515: connect: connection refused"
-2024/12/18 10:35:41 Communicator 0 lost devices; marking as FAILED
---- PASS: TestCoordinatorDeviceFailure (6.01s)
+... (additional test outputs) ...
 PASS
 ok      example.com/dsml/gpu_coordinator_service        6.706s
 ```
+This output shows a latency comparison between the two algorithms:
 
-We get an comparison between `NaiveAllReduce`, 126ms vs `RingAllReduce`, 8ms, which shows RingAllReduce reduces latency by 93.65% comparing to NaiveAllReduce.
+- **Naive AllReduce**: Latency of 83ms.
+- **AllReduce Ring**: Latency of 8ms.
+
+The key difference in their implementations lies in how data synchronization is handled:
+1. **Naive AllReduce**: Each device communicates with every other device, leading to higher communication overhead.
+2. **AllReduce Ring**: Devices are arranged in a logical ring, reducing communication steps to a minimum. This significantly lowers latency and improves efficiency.
 
 ---
 
 ### **2.2. GPU Device Server**
 
-The **GPU Device Servers** simulate individual GPU devices. Each server handles:  
-- **Memory Operations**: Using `Memcpy` to transfer data between the host and device.  
-- **Stream Communication**: Managing data streams for send and receive operations.  
-- **Metadata Retrieval**: Returning device memory information.
+The **GPU Device Server** simulates individual GPU devices. Each server handles:
+- **Memory Operations**: Transferring data between the host and device using `Memcpy`.
+- **Stream Communication**: Managing send and receive data streams.
+- **Metadata Retrieval**: Providing device memory information.
 
-#### **Test the GPU Device Server**  
-To run tests for the GPU Device Server:  
+#### **Tests for GPU Device Server**
+
+The following tests validate the GPU Device Server:
+
+1. **TestGetDeviceMetadata**: Ensures correct retrieval of device metadata.
+2. **TestBeginSend**: Tests initiating data sends from the device.
+3. **TestBeginReceive**: Verifies data receive operations on the device.
+4. **TestStreamSend**: Validates data stream send operations.
+5. **TestGetStreamStatus**: Ensures proper reporting of stream statuses.
+
+Run tests for the GPU Device Server:
 ```bash
 cd DSML/gpu_device_service
 go test -v
 ```
 **Expected Output:**
-```base
+```bash
 === RUN   TestGetDeviceMetadata
 --- PASS: TestGetDeviceMetadata (0.00s)
-=== RUN   TestBeginSend
---- PASS: TestBeginSend (0.00s)
-=== RUN   TestBeginReceive
---- PASS: TestBeginReceive (0.00s)
-=== RUN   TestStreamSend
---- PASS: TestStreamSend (0.00s)
-=== RUN   TestGetStreamStatus
---- PASS: TestGetStreamStatus (0.00s)
+... (additional test outputs) ...
 PASS
 ok      example.com/dsml/gpu_device_service     0.493s
 ```
@@ -139,68 +131,78 @@ ok      example.com/dsml/gpu_device_service     0.493s
 
 ## **3. ML Training and Testing**
 
-The **client** runs the MLP model training and performs the following tasks:  
-1. **Load MNIST Dataset**: Preprocesses training and testing data.  
-2. **Forward and Backward Pass**: Performs MLP computations.  
-3. **Gradient Synchronization**: Synchronizes gradients using the Coordinator Server.  
-4. **Model Updates**: Updates weights after aggregated gradients.  
-5. **Testing**: Evaluates the final model accuracy.
+The **client** manages the training and evaluation of the MLP model on the MNIST dataset. The MLP architecture includes:
+
+- **Input Layer**: 784 input nodes, corresponding to the flattened 28x28 pixel MNIST images.
+- **Hidden Layers**: Two hidden layers:
+  - **Layer 1**: 128 neurons with ReLU activation.
+  - **Layer 2**: 64 neurons with ReLU activation.
+- **Output Layer**: 10 output nodes, corresponding to the 10 possible digits (0-9), with softmax activation.
+
+Training parameters include:
+- **Batch Size**: 64 samples per batch.
+- **Learning Rate**: 0.01, with an adaptive learning rate scheduler.
+- **Optimizer**: Stochastic Gradient Descent (SGD).
+- **Epochs**: 10 iterations over the dataset.
+
+The process performs the following steps:
+
+1. **Load MNIST Dataset**: Preprocess training and testing data.
+2. **Forward and Backward Pass**: Execute MLP computations for each batch.
+3. **Gradient Synchronization**: Aggregate gradients using the Coordinator Server.
+4. **Model Updates**: Apply synchronized gradients to update weights.
+5. **Testing**: Evaluate model accuracy on the test dataset.
 
 ---
 
-### **Steps to Run the Pipeline**
+## **4. Pipeline Execution**
 
-1. **Start GPU Device Servers**:  
+### **Step 1: Start GPU Device Servers**
 
-Start 3 GPU Device Servers on ports **5003, 5004, and 5005**:  
-
+Launch three GPU Device Servers on ports **5003**, **5004**, and **5005**:
 ```bash
 cd DSML/cmd/gpu_device_server
 go run main.go
 ```
-Each device will run on a unique port with its own **Device ID**.
-**Expected Output**
+Each server runs on a unique port with its own **Device ID**.
+**Expected Output:**
 ```bash
 2024/12/18 10:40:12 GPU Device server listening on port 5003 with device ID 1
 2024/12/18 10:40:12 GPU Device server listening on port 5004 with device ID 2
 2024/12/18 10:40:12 GPU Device server listening on port 5005 with device ID 3
 ```
 
-2. **Start the GPU Coordinator Server** (in separate terminal):  
-   
+### **Step 2: Start the GPU Coordinator Server**
+
+In a separate terminal, start the Coordinator Server:
 ```bash
 cd DSML/cmd/gpu_coordinator_server
 go run main.go
 ```
 The server listens on **port 50051**.
-**Expected Output**
+**Expected Output:**
 ```bash
 2024/12/18 10:40:30 GPU Coordinator server listening on port 50051
 ```
 
-3. **Run the Client for Training**:  
-   Open a new terminal and execute:  
-   ```bash
-   cd DSML
-   go run client/client.go
-   ```
+### **Step 3: Run the Client for Training**
 
-**Expected Output**
+Open a new terminal and execute the client script:
+```bash
+cd DSML
+go run client/client.go
+```
+**Expected Output:**
 ```bash
 Loaded 60000 training samples
 Loaded 10000 test samples
 2024/12/18 10:41:30 Starting MLP training...
-2024/12/18 10:42:50 Epoch 1 complete: Avg Loss: 1.3723, Accuracy: 71.94%                                   
-2024/12/18 10:44:01 Epoch 2 complete: Avg Loss: 0.5282, Accuracy: 86.72%                                    
-2024/12/18 10:45:09 Epoch 3 complete: Avg Loss: 0.4082, Accuracy: 88.94%                                  
-2024/12/18 10:46:16 Epoch 4 complete: Avg Loss: 0.3627, Accuracy: 89.90%                                  
-2024/12/18 10:47:30 Epoch 5 complete: Avg Loss: 0.3364, Accuracy: 90.47%                                   
-2024/12/18 10:48:42 Epoch 6 complete: Avg Loss: 0.3176, Accuracy: 91.04%                                   
-2024/12/18 10:49:54 Epoch 7 complete: Avg Loss: 0.3024, Accuracy: 91.48%                                   
-2024/12/18 10:51:11 Epoch 8 complete: Avg Loss: 0.2893, Accuracy: 91.84%                                   
-2024/12/18 10:52:27 Epoch 9 complete: Avg Loss: 0.2775, Accuracy: 92.19%                                   
-2024/12/18 10:53:42 Epoch 10 complete: Avg Loss: 0.2668, Accuracy: 92.49%                                   
+2024/12/18 10:42:50 Epoch 1 complete: Avg Loss: 1.3723, Accuracy: 71.94%
+2024/12/18 10:44:01 Epoch 2 complete: Avg Loss: 0.5282, Accuracy: 86.72%
+... (output for subsequent epochs) ...
 2024/12/18 10:53:42 Training complete.
-Final Test Accuracy: 92.89%   
+Final Test Accuracy: 92.89%
 ```
+
+This indicates the MLP model achieves a test accuracy of **92.89%** after 10 epochs.
 
