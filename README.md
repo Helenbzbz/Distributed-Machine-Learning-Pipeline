@@ -187,8 +187,20 @@ The server listens on **port 50051**.
 
 **Expected Output**
 ```bash
-
+Loaded 60000 training samples
+Loaded 10000 test samples
+2024/12/18 10:41:30 Starting MLP training...
+2024/12/18 10:42:50 Epoch 1 complete: Avg Loss: 1.3723, Accuracy: 71.94%                                   
+2024/12/18 10:44:01 Epoch 2 complete: Avg Loss: 0.5282, Accuracy: 86.72%                                    
+2024/12/18 10:45:09 Epoch 3 complete: Avg Loss: 0.4082, Accuracy: 88.94%                                  
+2024/12/18 10:46:16 Epoch 4 complete: Avg Loss: 0.3627, Accuracy: 89.90%                                  
+2024/12/18 10:47:30 Epoch 5 complete: Avg Loss: 0.3364, Accuracy: 90.47%                                   
+2024/12/18 10:48:42 Epoch 6 complete: Avg Loss: 0.3176, Accuracy: 91.04%                                   
+2024/12/18 10:49:54 Epoch 7 complete: Avg Loss: 0.3024, Accuracy: 91.48%                                   
+2024/12/18 10:51:11 Epoch 8 complete: Avg Loss: 0.2893, Accuracy: 91.84%                                   
+2024/12/18 10:52:27 Epoch 9 complete: Avg Loss: 0.2775, Accuracy: 92.19%                                   
+2024/12/18 10:53:42 Epoch 10 complete: Avg Loss: 0.2668, Accuracy: 92.49%                                   
+2024/12/18 10:53:42 Training complete.
+Final Test Accuracy: 92.89%   
 ```
-
-
 
